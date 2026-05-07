@@ -2,7 +2,18 @@
     "translations": {
         "de": {
             "Vento Expert": "Vento Expert",
-            "Translation": "Übersetzung"
+            "Connection": "Verbindung",
+            "Timing": "Zeitverhalten",
+            "Debug": "Debug",
+            "Polling / Variables": "Polling / Variablen",
+            "Test / Manual Commands": "Test / Manuelle Befehle",
+            "Diagnostics": "Diagnose",
+            "Parameter Browser": "Parameter-Browser",
+            "IP/Host is missing": "IP/Host fehlt",
+            "Port is invalid": "Port ist ungueltig",
+            "Device ID is invalid": "Device ID ist ungueltig",
+            "Password is invalid": "Passwort ist ungueltig",
+            "UDP Socket parent is inactive": "UDP-Socket-Parent ist inaktiv"
         }
     }
 }

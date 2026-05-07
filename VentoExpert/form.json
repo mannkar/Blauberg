@@ -13,10 +13,326 @@
                     }
                 ]
             }
+        },
+        {
+            "type": "ExpansionPanel",
+            "caption": "Connection",
+            "expanded": true,
+            "items": [
+                {
+                    "type": "ValidationTextBox",
+                    "name": "Host",
+                    "caption": "IP/Host"
+                },
+                {
+                    "type": "NumberSpinner",
+                    "name": "Port",
+                    "caption": "Port",
+                    "minimum": 1,
+                    "maximum": 65535
+                },
+                {
+                    "type": "CheckBox",
+                    "name": "EnableBroadcast",
+                    "caption": "Enable broadcast"
+                },
+                {
+                    "type": "ValidationTextBox",
+                    "name": "DeviceID",
+                    "caption": "Device ID"
+                },
+                {
+                    "type": "PasswordTextBox",
+                    "name": "Password",
+                    "caption": "Password"
+                }
+            ]
+        },
+        {
+            "type": "ExpansionPanel",
+            "caption": "Timing",
+            "items": [
+                {
+                    "type": "NumberSpinner",
+                    "name": "Timeout",
+                    "caption": "Timeout",
+                    "minimum": 100,
+                    "maximum": 10000,
+                    "suffix": "ms"
+                },
+                {
+                    "type": "NumberSpinner",
+                    "name": "Retries",
+                    "caption": "Retries",
+                    "minimum": 0,
+                    "maximum": 10
+                },
+                {
+                    "type": "NumberSpinner",
+                    "name": "RateLimit",
+                    "caption": "Rate limit",
+                    "minimum": 0,
+                    "maximum": 5000,
+                    "suffix": "ms"
+                },
+                {
+                    "type": "NumberSpinner",
+                    "name": "PollInterval",
+                    "caption": "Poll interval",
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "suffix": "s"
+                }
+            ]
+        },
+        {
+            "type": "ExpansionPanel",
+            "caption": "Debug",
+            "items": [
+                {
+                    "type": "NumberSpinner",
+                    "name": "DebugLevel",
+                    "caption": "Debug level 0..5",
+                    "minimum": 0,
+                    "maximum": 5
+                },
+                {
+                    "type": "CheckBox",
+                    "name": "LogRaw",
+                    "caption": "Log RAW"
+                },
+                {
+                    "type": "NumberSpinner",
+                    "name": "DebugBufferSize",
+                    "caption": "Debug buffer size",
+                    "minimum": 1,
+                    "maximum": 500
+                }
+            ]
+        },
+        {
+            "type": "ExpansionPanel",
+            "caption": "Polling / Variables",
+            "items": [
+                {
+                    "type": "CheckBox",
+                    "name": "CreateVariables",
+                    "caption": "Create variables"
+                },
+                {
+                    "type": "List",
+                    "name": "PollParameters",
+                    "caption": "Polled parameters",
+                    "rowCount": 10,
+                    "add": true,
+                    "delete": true,
+                    "columns": [
+                        {
+                            "caption": "Active",
+                            "name": "enabled",
+                            "width": "80px",
+                            "add": true,
+                            "edit": {
+                                "type": "CheckBox"
+                            }
+                        },
+                        {
+                            "caption": "Address",
+                            "name": "address",
+                            "width": "100px",
+                            "add": "0x0001",
+                            "edit": {
+                                "type": "ValidationTextBox"
+                            }
+                        },
+                        {
+                            "caption": "Name",
+                            "name": "name",
+                            "width": "auto",
+                            "add": ""
+                        },
+                        {
+                            "caption": "R/W",
+                            "name": "access",
+                            "width": "100px",
+                            "add": ""
+                        },
+                        {
+                            "caption": "Type",
+                            "name": "type",
+                            "width": "100px",
+                            "add": ""
+                        }
+                    ],
+                    "values": []
+                }
+            ]
         }
     ],
     "actions": [
+        {
+            "type": "ExpansionPanel",
+            "caption": "Test / Manual Commands",
+            "expanded": true,
+            "items": [
+                {
+                    "type": "Button",
+                    "caption": "SelfTest",
+                    "onClick": "IPS_RequestAction($id, 'SelfTest', '');"
+                },
+                {
+                    "type": "ValidationTextBox",
+                    "name": "ReadAddress",
+                    "caption": "Read address",
+                    "value": "0x0001"
+                },
+                {
+                    "type": "Button",
+                    "caption": "Read Parameter",
+                    "onClick": "IPS_RequestAction($id, 'ReadParameterForm', $ReadAddress);"
+                },
+                {
+                    "type": "ValidationTextBox",
+                    "name": "WriteAddress",
+                    "caption": "Write address",
+                    "value": "0x0001"
+                },
+                {
+                    "type": "ValidationTextBox",
+                    "name": "WriteValue",
+                    "caption": "Write value",
+                    "value": "1"
+                },
+                {
+                    "type": "CheckBox",
+                    "name": "WriteRequireResponse",
+                    "caption": "Require response",
+                    "value": true
+                },
+                {
+                    "type": "Button",
+                    "caption": "Write Parameter",
+                    "onClick": "IPS_RequestAction($id, 'WriteParameterForm', json_encode(['address' => $WriteAddress, 'value' => $WriteValue, 'requireResponse' => $WriteRequireResponse]));"
+                },
+                {
+                    "type": "ValidationTextBox",
+                    "name": "RawHex",
+                    "caption": "Raw hex",
+                    "value": "FD FD"
+                },
+                {
+                    "type": "Button",
+                    "caption": "Send Raw (Hex)",
+                    "onClick": "IPS_RequestAction($id, 'SendRawHex', $RawHex);"
+                },
+                {
+                    "type": "Button",
+                    "caption": "Poll Now",
+                    "onClick": "IPS_RequestAction($id, 'PollNow', '');"
+                }
+            ]
+        },
+        {
+            "type": "ExpansionPanel",
+            "caption": "Diagnostics",
+            "items": [
+                {
+                    "type": "Button",
+                    "caption": "Dump Status",
+                    "onClick": "IPS_RequestAction($id, 'DumpStatus', '');"
+                },
+                {
+                    "type": "Button",
+                    "caption": "Dump Debug Buffer",
+                    "onClick": "IPS_RequestAction($id, 'DumpDebugBuffer', '');"
+                },
+                {
+                    "type": "Button",
+                    "caption": "Clear Debug Buffer",
+                    "onClick": "IPS_RequestAction($id, 'ClearDebugBuffer', '');"
+                }
+            ]
+        },
+        {
+            "type": "List",
+            "name": "ParameterBrowser",
+            "caption": "Parameter Browser",
+            "rowCount": 20,
+            "columns": [
+                {
+                    "caption": "Address",
+                    "name": "address",
+                    "width": "90px"
+                },
+                {
+                    "caption": "Name",
+                    "name": "name",
+                    "width": "auto"
+                },
+                {
+                    "caption": "R/W",
+                    "name": "access",
+                    "width": "110px"
+                },
+                {
+                    "caption": "Type",
+                    "name": "type",
+                    "width": "95px"
+                },
+                {
+                    "caption": "Size",
+                    "name": "size",
+                    "width": "70px"
+                },
+                {
+                    "caption": "Current value",
+                    "name": "value",
+                    "width": "180px"
+                },
+                {
+                    "caption": "Raw",
+                    "name": "raw",
+                    "width": "120px"
+                },
+                {
+                    "caption": "Timestamp",
+                    "name": "timestamp",
+                    "width": "180px"
+                }
+            ],
+            "values": []
+        }
     ],
     "status": [
+        {
+            "code": 102,
+            "icon": "active",
+            "caption": "Active"
+        },
+        {
+            "code": 201,
+            "icon": "error",
+            "caption": "IP/Host is missing"
+        },
+        {
+            "code": 202,
+            "icon": "error",
+            "caption": "Port is invalid"
+        },
+        {
+            "code": 203,
+            "icon": "error",
+            "caption": "Device ID is invalid"
+        },
+        {
+            "code": 204,
+            "icon": "error",
+            "caption": "Password is invalid"
+        },
+        {
+            "code": 205,
+            "icon": "inactive",
+            "caption": "UDP Socket parent is inactive"
+        }
     ]
 }
