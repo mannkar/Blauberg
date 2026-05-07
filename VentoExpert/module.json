@@ -1,0 +1,16 @@
+{
+    "id": "{D4C5E4AC-AD6B-4A2C-2861-B6FD7DA960B6}",
+    "name": "Vento Expert",
+    "url": "https://www.symcon.de",
+    "type": 3,
+    "vendor": "Blauberg",
+    "aliases": [
+    ],
+    "parentRequirements": [
+    ],
+    "childRequirements": [
+    ],
+    "implemented": [
+    ],
+    "prefix": "BVE"
+}

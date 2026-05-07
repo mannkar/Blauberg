@@ -1,0 +1,22 @@
+{
+    "elements": [
+        {
+            "name": "EchoPopup",
+            "type": "PopupAlert",
+            "visible": false,
+            "popup": {
+                "items": [
+                    {
+                        "type": "Label",
+                        "name": "EchoMessage",
+                        "caption": ""
+                    }
+                ]
+            }
+        }
+    ],
+    "actions": [
+    ],
+    "status": [
+    ]
+}

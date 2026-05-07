@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+    <title>Vento Expert</title>
+    <meta charset="UTF-8" />
+    <style>
+        /* Hier kann ich den margin vom Body überschreibe oder die background-color setzen usw. */
+        /* Die Root-Variablen --accent-color, --content-color und --card-color sind immer vordefiniert. */
+        /* Kann aber auch eigene Variablen definieren. Gute Technik um nicht direkt das CSS zu manipulieren zu müssen */
+
+        :root {
+            --bg-color: #208a74;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            margin-left: 10px;
+            /* Standard 20px */
+            margin-right: 10px;
+            /* Standard 20px */
+        }
+
+        #container {
+            height: calc(100% - 75px);
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            /* horizontal zentrieren */
+            align-items: center;
+            /* vertikal zentrieren */
+            box-sizing: border-box;
+        }
+    </style>
+    <script>
+        // Hier werden die Daten vom Modul verarbeitet.
+        function handleMessage(data) {
+            //console.log('Rohdaten empfangen:', data);
+            const decodedData = JSON.parse(data);
+            //console.log('Decodierte Daten:', decodedData);
+            var root = document.documentElement;
+            for (const parameter in decodedData) {
+                console.log('Parameter:', parameter, 'Wert:', decodedData[parameter]);
+                switch (parameter) {
+                    case 'bgcolor':
+                        if (decodedData[parameter]) {
+                            root.style.setProperty('--bg-color', decodedData[parameter]);
+                        }
+                        break;
+                    case 'text':
+                        text.textContent = decodedData[parameter];
+                        break;
+                    default:
+                        console.log('Unbekannter Parameter:', parameter);
+                        break;
+                }
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="container">
+        <span id="text">Vordefinierter Text</span>
+    </div>
+</body>
+
+</html>
