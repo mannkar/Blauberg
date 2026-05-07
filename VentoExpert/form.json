@@ -20,21 +20,8 @@
             "expanded": true,
             "items": [
                 {
-                    "type": "ValidationTextBox",
-                    "name": "Host",
-                    "caption": "IP/Host"
-                },
-                {
-                    "type": "NumberSpinner",
-                    "name": "Port",
-                    "caption": "Port",
-                    "minimum": 1,
-                    "maximum": 65535
-                },
-                {
-                    "type": "CheckBox",
-                    "name": "EnableBroadcast",
-                    "caption": "Enable broadcast"
+                    "type": "Label",
+                    "caption": "UDP Host, Port und Broadcast werden in Symcon 9 am uebergeordneten UDP Socket konfiguriert."
                 },
                 {
                     "type": "ValidationTextBox",

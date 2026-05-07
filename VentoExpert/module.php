@@ -66,7 +66,6 @@ class VentoExpert extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
-        $this->ConnectParent(self::GUID_UDP_SOCKET);
         $this->MaintainConfiguredVariables();
 
         if (!$this->ValidateConfiguration()) {
@@ -88,21 +87,20 @@ class VentoExpert extends IPSModuleStrict
     public function GetCompatibleParents(): string
     {
         return json_encode([
-            'moduleIDs' => [
-                self::GUID_UDP_SOCKET
+            'type' => 'require',
+            'modules' => [
+                [
+                    'moduleID' => self::GUID_UDP_SOCKET,
+                    'initial' => [
+                        'Host' => $this->ReadPropertyString('Host'),
+                        'Port' => $this->ReadPropertyInteger('Port'),
+                        'BindIP' => '',
+                        'BindPort' => 0,
+                        'EnableBroadcast' => $this->ReadPropertyBoolean('EnableBroadcast'),
+                        'EnableReuseAddress' => true
+                    ]
+                ]
             ]
-        ]);
-    }
-
-    public function GetConfigurationForParent(): string
-    {
-        return json_encode([
-            'Host' => $this->ReadPropertyString('Host'),
-            'Port' => $this->ReadPropertyInteger('Port'),
-            'BindIP' => '',
-            'BindPort' => 0,
-            'EnableBroadcast' => $this->ReadPropertyBoolean('EnableBroadcast'),
-            'EnableReuseAddress' => true
         ]);
     }
 
@@ -341,8 +339,8 @@ class VentoExpert extends IPSModuleStrict
     {
         $report = [
             'configuration' => [
-                'host' => $this->ReadPropertyString('Host'),
-                'port' => $this->ReadPropertyInteger('Port'),
+                'host' => $this->GetEffectiveHost(),
+                'port' => $this->GetEffectivePort(),
                 'deviceID' => $this->ReadPropertyString('DeviceID'),
                 'passwordLength' => strlen($this->ReadPropertyString('Password')),
                 'timeoutMs' => $this->ReadPropertyInteger('Timeout'),
@@ -399,8 +397,8 @@ class VentoExpert extends IPSModuleStrict
         return $this->ToPrettyJson([
             'instanceID' => $this->InstanceID,
             'status' => [
-                'host' => $this->ReadPropertyString('Host'),
-                'port' => $this->ReadPropertyInteger('Port'),
+                'host' => $this->GetEffectiveHost(),
+                'port' => $this->GetEffectivePort(),
                 'deviceID' => $this->ReadPropertyString('DeviceID'),
                 'passwordLength' => strlen($this->ReadPropertyString('Password')),
                 'timeoutMs' => $this->ReadPropertyInteger('Timeout'),
@@ -418,17 +416,6 @@ class VentoExpert extends IPSModuleStrict
 
     private function ValidateConfiguration(): bool
     {
-        if (trim($this->ReadPropertyString('Host')) === '') {
-            $this->SetStatus(self::STATUS_HOST_MISSING);
-            return false;
-        }
-
-        $port = $this->ReadPropertyInteger('Port');
-        if ($port < 1 || $port > 65535) {
-            $this->SetStatus(self::STATUS_PORT_INVALID);
-            return false;
-        }
-
         try {
             $this->GetDeviceIdBytes();
         } catch (Throwable $e) {
@@ -499,8 +486,8 @@ class VentoExpert extends IPSModuleStrict
             'DataID' => self::DATA_ID_UDP_TX,
             'Type' => 0,
             'Buffer' => utf8_encode($packet),
-            'ClientIP' => $this->ReadPropertyString('Host'),
-            'ClientPort' => $this->ReadPropertyInteger('Port')
+            'ClientIP' => $this->GetEffectiveHost(),
+            'ClientPort' => $this->GetEffectivePort()
         ];
 
         $encoded = json_encode($payload);
@@ -514,6 +501,38 @@ class VentoExpert extends IPSModuleStrict
         }
 
         $this->WriteAttributeString('LastTxTime', (string) microtime(true));
+    }
+
+    private function GetEffectiveHost(): string
+    {
+        $parentId = $this->GetParentInstanceId();
+        if ($parentId > 0) {
+            $host = trim((string) @IPS_GetProperty($parentId, 'Host'));
+            if ($host !== '') {
+                return $host;
+            }
+        }
+
+        return trim($this->ReadPropertyString('Host'));
+    }
+
+    private function GetEffectivePort(): int
+    {
+        $parentId = $this->GetParentInstanceId();
+        if ($parentId > 0) {
+            $port = (int) @IPS_GetProperty($parentId, 'Port');
+            if ($port > 0) {
+                return $port;
+            }
+        }
+
+        return $this->ReadPropertyInteger('Port');
+    }
+
+    private function GetParentInstanceId(): int
+    {
+        $instance = IPS_GetInstance($this->InstanceID);
+        return isset($instance['ConnectionID']) ? (int) $instance['ConnectionID'] : 0;
     }
 
     private function WaitForResponse(float $started, int $timeoutMs): ?array
