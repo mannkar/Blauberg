@@ -34,6 +34,15 @@ class VentoExpert extends IPSModuleStrict
     private const DEBUG_INFO = 3;
     private const DEBUG_VERBOSE = 4;
     private const DEBUG_TRACE = 5;
+    private const PROFILE_UNIT_ON_OFF = 'BVE.UnitOnOff';
+    private const PROFILE_SPEED_NUMBER = 'BVE.SpeedNumber';
+    private const PROFILE_BOOST_STATUS = 'BVE.BoostStatus';
+    private const PROFILE_TIMER_MODE = 'BVE.TimerMode';
+    private const PROFILE_HUMIDITY = 'BVE.Humidity';
+    private const PROFILE_FAN_RPM = 'BVE.FanRpm';
+    private const PROFILE_ALARM_WARNING = 'BVE.AlarmWarning';
+    private const PROFILE_FILTER_REPLACEMENT = 'BVE.FilterReplacement';
+    private const PROFILE_UNIT_TYPE = 'BVE.UnitType';
 
     public function Create(): void
     {
@@ -67,6 +76,7 @@ class VentoExpert extends IPSModuleStrict
     public function ApplyChanges(): void
     {
         parent::ApplyChanges();
+        $this->EnsureVariableProfiles();
 
         $this->MaintainConfiguredVariables();
 
@@ -1171,9 +1181,130 @@ class VentoExpert extends IPSModuleStrict
             $name = $definition['name'] ?? sprintf('Parameter 0x%04X', $address);
             $ident = $this->GetVariableIdent($address);
             $type = $this->GetVariableType($address);
-            $this->MaintainVariable($ident, $name, $type, '', $position, $create);
+            $profile = $this->GetVariableProfile($address);
+            $this->MaintainVariable($ident, $name, $type, $profile, $position, $create);
             $this->MaintainAction($ident, $create && $this->IsWritable($address));
             $position++;
+        }
+    }
+
+    private function EnsureVariableProfiles(): void
+    {
+        $this->EnsureProfileUnitOnOff();
+        $this->EnsureProfileSpeedNumber();
+        $this->EnsureProfileBoostStatus();
+        $this->EnsureProfileTimerMode();
+        $this->EnsureProfileHumidity();
+        $this->EnsureProfileFanRpm();
+        $this->EnsureProfileAlarmWarning();
+        $this->EnsureProfileFilterReplacement();
+        $this->EnsureProfileUnitType();
+    }
+
+    private function EnsureProfileUnitOnOff(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_UNIT_ON_OFF, 'Power', '', 0, 2, 0, [
+            ['value' => 0, 'name' => 'Aus', 'icon' => 'Power', 'color' => 0x808080],
+            ['value' => 1, 'name' => 'Ein', 'icon' => 'Power', 'color' => 0x2FA84F],
+            ['value' => 2, 'name' => 'Invert', 'icon' => 'Shuffle', 'color' => 0xE39A13]
+        ]);
+    }
+
+    private function EnsureProfileSpeedNumber(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_SPEED_NUMBER, 'Speedo', '', 1, 255, 0, [
+            ['value' => 1, 'name' => 'Stufe 1', 'icon' => 'Speedo', 'color' => 0x4F81BD],
+            ['value' => 2, 'name' => 'Stufe 2', 'icon' => 'Speedo', 'color' => 0x2FA84F],
+            ['value' => 3, 'name' => 'Stufe 3', 'icon' => 'Speedo', 'color' => 0xE39A13],
+            ['value' => 255, 'name' => 'Manuell', 'icon' => 'Gear', 'color' => 0x7B5AA6]
+        ]);
+    }
+
+    private function EnsureProfileBoostStatus(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_BOOST_STATUS, 'Rocket', '', 0, 1, 0, [
+            ['value' => 0, 'name' => 'Aus', 'icon' => 'Rocket', 'color' => 0x808080],
+            ['value' => 1, 'name' => 'Ein', 'icon' => 'Rocket', 'color' => 0xE39A13]
+        ]);
+    }
+
+    private function EnsureProfileTimerMode(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_TIMER_MODE, 'Clock', '', 0, 2, 0, [
+            ['value' => 0, 'name' => 'Aus', 'icon' => 'Clock', 'color' => 0x808080],
+            ['value' => 1, 'name' => 'Nacht', 'icon' => 'Moon', 'color' => 0x4F81BD],
+            ['value' => 2, 'name' => 'Party', 'icon' => 'Party', 'color' => 0xE39A13]
+        ]);
+    }
+
+    private function EnsureProfileHumidity(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_HUMIDITY, 'Drops', ' %', 0, 100, 1);
+    }
+
+    private function EnsureProfileFanRpm(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_FAN_RPM, 'Ventilation', ' rpm', 0, 6000, 1);
+    }
+
+    private function EnsureProfileAlarmWarning(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_ALARM_WARNING, 'Warning', '', 0, 255, 0, [
+            ['value' => 0, 'name' => 'OK', 'icon' => 'Ok', 'color' => 0x2FA84F],
+            ['value' => 1, 'name' => 'Alarm/Warnung', 'icon' => 'Warning', 'color' => 0xD94B4B]
+        ]);
+    }
+
+    private function EnsureProfileFilterReplacement(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_FILTER_REPLACEMENT, 'Alert', '', 0, 1, 0, [
+            ['value' => 0, 'name' => 'OK', 'icon' => 'Ok', 'color' => 0x2FA84F],
+            ['value' => 1, 'name' => 'Filterwechsel', 'icon' => 'Alert', 'color' => 0xD94B4B]
+        ]);
+    }
+
+    private function EnsureProfileUnitType(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_UNIT_TYPE, 'Gear', '', 0, 65535, 1);
+    }
+
+    private function EnsureIntegerProfile(string $profileName, string $icon, string $suffix, int $min, int $max, int $step, array $associations = []): void
+    {
+        if (!IPS_VariableProfileExists($profileName)) {
+            IPS_CreateVariableProfile($profileName, VARIABLETYPE_INTEGER);
+        }
+
+        $profile = IPS_GetVariableProfile($profileName);
+        if (!is_array($profile) || ((int) ($profile['ProfileType'] ?? -1) !== VARIABLETYPE_INTEGER)) {
+            throw new RuntimeException('Variable profile "' . $profileName . '" exists but is not of type INTEGER.');
+        }
+
+        IPS_SetVariableProfileIcon($profileName, $icon);
+        IPS_SetVariableProfileText($profileName, '', $suffix);
+        IPS_SetVariableProfileDigits($profileName, 0);
+        IPS_SetVariableProfileValues($profileName, $min, $max, $step);
+
+        $desired = [];
+        foreach ($associations as $association) {
+            $value = (int) ($association['value'] ?? 0);
+            $desired[$value] = true;
+        }
+
+        $currentAssociations = isset($profile['Associations']) && is_array($profile['Associations']) ? $profile['Associations'] : [];
+        foreach ($currentAssociations as $association) {
+            $value = (int) ($association['Value'] ?? 0);
+            if (isset($desired[$value])) {
+                continue;
+            }
+            IPS_SetVariableProfileAssociation($profileName, $value, '', '', -1);
+        }
+
+        foreach ($associations as $association) {
+            $value = (int) ($association['value'] ?? 0);
+            $name = (string) ($association['name'] ?? (string) $value);
+            $assocIcon = (string) ($association['icon'] ?? '');
+            $color = isset($association['color']) ? (int) $association['color'] : -1;
+            IPS_SetVariableProfileAssociation($profileName, $value, $name, $assocIcon, $color);
         }
     }
 
@@ -1448,6 +1579,33 @@ class VentoExpert extends IPSModuleStrict
     private function GetVariableIdent(int $address): string
     {
         return sprintf('P_%04X', $address);
+    }
+
+    private function GetVariableProfile(int $address): string
+    {
+        switch ($address) {
+            case 0x0001:
+                return self::PROFILE_UNIT_ON_OFF;
+            case 0x0002:
+                return self::PROFILE_SPEED_NUMBER;
+            case 0x0006:
+                return self::PROFILE_BOOST_STATUS;
+            case 0x0007:
+                return self::PROFILE_TIMER_MODE;
+            case 0x0025:
+                return self::PROFILE_HUMIDITY;
+            case 0x004A:
+            case 0x004B:
+                return self::PROFILE_FAN_RPM;
+            case 0x0083:
+                return self::PROFILE_ALARM_WARNING;
+            case 0x0088:
+                return self::PROFILE_FILTER_REPLACEMENT;
+            case 0x00B9:
+                return self::PROFILE_UNIT_TYPE;
+        }
+
+        return '';
     }
 
     private function GetParameterDefinition(int $address): array
