@@ -43,6 +43,22 @@ class VentoExpert extends IPSModuleStrict
     private const PROFILE_ALARM_WARNING = 'BVE.AlarmWarning';
     private const PROFILE_FILTER_REPLACEMENT = 'BVE.FilterReplacement';
     private const PROFILE_UNIT_TYPE = 'BVE.UnitType';
+    private const PROFILE_ON_OFF = 'BVE.OnOff';
+    private const PROFILE_THRESHOLD_STATUS = 'BVE.ThresholdStatus';
+    private const PROFILE_HUMIDITY_SETPOINT = 'BVE.HumiditySetpoint';
+    private const PROFILE_MILLIVOLT = 'BVE.MilliVolt';
+    private const PROFILE_PERCENT = 'BVE.Percent';
+    private const PROFILE_PERCENT_5_100 = 'BVE.Percent5To100';
+    private const PROFILE_FAN_POWER = 'BVE.FanPower';
+    private const PROFILE_FILTER_DAYS = 'BVE.FilterDays';
+    private const PROFILE_DELAY_MINUTES = 'BVE.DelayMinutes';
+    private const PROFILE_WEEKLY_SCHEDULE_MODE = 'BVE.WeeklyScheduleMode';
+    private const PROFILE_WIFI_MODE = 'BVE.WifiMode';
+    private const PROFILE_WIFI_ENCRYPTION = 'BVE.WifiEncryption';
+    private const PROFILE_WIFI_CHANNEL = 'BVE.WifiChannel';
+    private const PROFILE_WIFI_DHCP = 'BVE.WifiDhcp';
+    private const PROFILE_VENTILATOR_MODE = 'BVE.VentilatorMode';
+    private const PROFILE_EXECUTE = 'BVE.Execute';
 
     public function Create(): void
     {
@@ -1191,13 +1207,29 @@ class VentoExpert extends IPSModuleStrict
     private function EnsureVariableProfiles(): void
     {
         $this->EnsureProfileUnitOnOff();
+        $this->EnsureProfileOnOff();
         $this->EnsureProfileSpeedNumber();
         $this->EnsureProfileBoostStatus();
         $this->EnsureProfileTimerMode();
         $this->EnsureProfileHumidity();
+        $this->EnsureProfileHumiditySetpoint();
+        $this->EnsureProfileMilliVolt();
+        $this->EnsureProfilePercent();
+        $this->EnsureProfilePercent5To100();
+        $this->EnsureProfileFanPower();
         $this->EnsureProfileFanRpm();
+        $this->EnsureProfileFilterDays();
+        $this->EnsureProfileDelayMinutes();
+        $this->EnsureProfileWeeklyScheduleMode();
         $this->EnsureProfileAlarmWarning();
         $this->EnsureProfileFilterReplacement();
+        $this->EnsureProfileThresholdStatus();
+        $this->EnsureProfileWifiMode();
+        $this->EnsureProfileWifiEncryption();
+        $this->EnsureProfileWifiChannel();
+        $this->EnsureProfileWifiDhcp();
+        $this->EnsureProfileVentilatorMode();
+        $this->EnsureProfileExecute();
         $this->EnsureProfileUnitType();
     }
 
@@ -1217,6 +1249,14 @@ class VentoExpert extends IPSModuleStrict
             ['value' => 2, 'name' => 'Stufe 2', 'icon' => 'Speedo', 'color' => 0x2FA84F],
             ['value' => 3, 'name' => 'Stufe 3', 'icon' => 'Speedo', 'color' => 0xE39A13],
             ['value' => 255, 'name' => 'Manuell', 'icon' => 'Gear', 'color' => 0x7B5AA6]
+        ]);
+    }
+
+    private function EnsureProfileOnOff(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_ON_OFF, 'Power', '', 0, 1, 0, [
+            ['value' => 0, 'name' => 'Aus', 'icon' => 'Power', 'color' => 0x808080],
+            ['value' => 1, 'name' => 'Ein', 'icon' => 'Power', 'color' => 0x2FA84F]
         ]);
     }
 
@@ -1242,16 +1282,61 @@ class VentoExpert extends IPSModuleStrict
         $this->EnsureIntegerProfile(self::PROFILE_HUMIDITY, 'Drops', ' %', 0, 100, 1);
     }
 
+    private function EnsureProfileHumiditySetpoint(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_HUMIDITY_SETPOINT, 'Drops', ' RH%', 40, 80, 1);
+    }
+
+    private function EnsureProfileMilliVolt(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_MILLIVOLT, 'Battery', ' mV', 0, 5000, 1);
+    }
+
+    private function EnsureProfilePercent(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_PERCENT, 'Gauge', ' %', 0, 100, 1);
+    }
+
+    private function EnsureProfilePercent5To100(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_PERCENT_5_100, 'Gauge', ' %', 5, 100, 1);
+    }
+
+    private function EnsureProfileFanPower(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_FAN_POWER, 'Speedo', '', 0, 255, 1);
+    }
+
     private function EnsureProfileFanRpm(): void
     {
         $this->EnsureIntegerProfile(self::PROFILE_FAN_RPM, 'Ventilation', ' rpm', 0, 6000, 1);
     }
 
+    private function EnsureProfileFilterDays(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_FILTER_DAYS, 'Calendar', ' d', 70, 365, 1);
+    }
+
+    private function EnsureProfileDelayMinutes(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_DELAY_MINUTES, 'Clock', ' min', 0, 60, 1);
+    }
+
+    private function EnsureProfileWeeklyScheduleMode(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_WEEKLY_SCHEDULE_MODE, 'Calendar', '', 0, 2, 0, [
+            ['value' => 0, 'name' => 'Aus', 'icon' => 'Calendar', 'color' => 0x808080],
+            ['value' => 1, 'name' => 'Ein', 'icon' => 'Calendar', 'color' => 0x2FA84F],
+            ['value' => 2, 'name' => 'Invert', 'icon' => 'Shuffle', 'color' => 0xE39A13]
+        ]);
+    }
+
     private function EnsureProfileAlarmWarning(): void
     {
-        $this->EnsureIntegerProfile(self::PROFILE_ALARM_WARNING, 'Warning', '', 0, 255, 0, [
+        $this->EnsureIntegerProfile(self::PROFILE_ALARM_WARNING, 'Warning', '', 0, 2, 0, [
             ['value' => 0, 'name' => 'OK', 'icon' => 'Ok', 'color' => 0x2FA84F],
-            ['value' => 1, 'name' => 'Alarm/Warnung', 'icon' => 'Warning', 'color' => 0xD94B4B]
+            ['value' => 1, 'name' => 'Alarm', 'icon' => 'Warning', 'color' => 0xD94B4B],
+            ['value' => 2, 'name' => 'Warnung', 'icon' => 'Alert', 'color' => 0xE39A13]
         ]);
     }
 
@@ -1265,7 +1350,68 @@ class VentoExpert extends IPSModuleStrict
 
     private function EnsureProfileUnitType(): void
     {
-        $this->EnsureIntegerProfile(self::PROFILE_UNIT_TYPE, 'Gear', '', 0, 65535, 1);
+        $this->EnsureIntegerProfile(self::PROFILE_UNIT_TYPE, 'Gear', '', 0, 65535, 1, [
+            ['value' => 3, 'name' => 'A50/A85/A100 V.2', 'icon' => 'Ventilation', 'color' => 0x4F81BD],
+            ['value' => 4, 'name' => 'Duo A30-1 V.2', 'icon' => 'Ventilation', 'color' => 0x2FA84F],
+            ['value' => 5, 'name' => 'A30 V.2', 'icon' => 'Ventilation', 'color' => 0xE39A13]
+        ]);
+    }
+
+    private function EnsureProfileThresholdStatus(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_THRESHOLD_STATUS, 'Gauge', '', 0, 1, 0, [
+            ['value' => 0, 'name' => 'Unter Soll', 'icon' => 'ArrowRight', 'color' => 0x4F81BD],
+            ['value' => 1, 'name' => 'Ueber Soll', 'icon' => 'ArrowRight', 'color' => 0xD94B4B]
+        ]);
+    }
+
+    private function EnsureProfileWifiMode(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_WIFI_MODE, 'Network', '', 1, 2, 0, [
+            ['value' => 1, 'name' => 'Client', 'icon' => 'Internet', 'color' => 0x2FA84F],
+            ['value' => 2, 'name' => 'Access Point', 'icon' => 'Network', 'color' => 0x4F81BD]
+        ]);
+    }
+
+    private function EnsureProfileWifiEncryption(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_WIFI_ENCRYPTION, 'Lock', '', 48, 52, 0, [
+            ['value' => 48, 'name' => 'OPEN', 'icon' => 'LockOpen', 'color' => 0x808080],
+            ['value' => 50, 'name' => 'WPA_PSK', 'icon' => 'Lock', 'color' => 0x4F81BD],
+            ['value' => 51, 'name' => 'WPA2_PSK', 'icon' => 'Lock', 'color' => 0x2FA84F],
+            ['value' => 52, 'name' => 'WPA_WPA2_PSK', 'icon' => 'Lock', 'color' => 0xE39A13]
+        ]);
+    }
+
+    private function EnsureProfileWifiChannel(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_WIFI_CHANNEL, 'Network', '', 1, 13, 1);
+    }
+
+    private function EnsureProfileWifiDhcp(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_WIFI_DHCP, 'Network', '', 0, 2, 0, [
+            ['value' => 0, 'name' => 'STATIC', 'icon' => 'Network', 'color' => 0x808080],
+            ['value' => 1, 'name' => 'DHCP', 'icon' => 'Network', 'color' => 0x2FA84F],
+            ['value' => 2, 'name' => 'Invert', 'icon' => 'Shuffle', 'color' => 0xE39A13]
+        ]);
+    }
+
+    private function EnsureProfileVentilatorMode(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_VENTILATOR_MODE, 'Ventilation', '', 0, 2, 0, [
+            ['value' => 0, 'name' => 'Ventilation', 'icon' => 'Ventilation', 'color' => 0x4F81BD],
+            ['value' => 1, 'name' => 'Waermerueckgewinnung', 'icon' => 'Recycling', 'color' => 0x2FA84F],
+            ['value' => 2, 'name' => 'Zuluft', 'icon' => 'ArrowRight', 'color' => 0xE39A13]
+        ]);
+    }
+
+    private function EnsureProfileExecute(): void
+    {
+        $this->EnsureIntegerProfile(self::PROFILE_EXECUTE, 'Execute', '', 0, 1, 0, [
+            ['value' => 0, 'name' => 'Idle', 'icon' => 'Ok', 'color' => 0x808080],
+            ['value' => 1, 'name' => 'Ausfuehren', 'icon' => 'Execute', 'color' => 0x2FA84F]
+        ]);
     }
 
     private function EnsureIntegerProfile(string $profileName, string $icon, string $suffix, int $min, int $max, int $step, array $associations = []): void
@@ -1592,17 +1738,68 @@ class VentoExpert extends IPSModuleStrict
                 return self::PROFILE_BOOST_STATUS;
             case 0x0007:
                 return self::PROFILE_TIMER_MODE;
+            case 0x000F:
+            case 0x0014:
+            case 0x0016:
+            case 0x0085:
+            case 0x032A:
+            case 0x032B:
+                return self::PROFILE_UNIT_ON_OFF;
+            case 0x0019:
+                return self::PROFILE_HUMIDITY_SETPOINT;
+            case 0x0024:
+                return self::PROFILE_MILLIVOLT;
             case 0x0025:
                 return self::PROFILE_HUMIDITY;
+            case 0x002D:
+                return self::PROFILE_PERCENT;
+            case 0x0032:
+                return self::PROFILE_ON_OFF;
+            case 0x003A:
+            case 0x003B:
+            case 0x003C:
+            case 0x003D:
+            case 0x003E:
+            case 0x003F:
+            case 0x0044:
+                return self::PROFILE_FAN_POWER;
             case 0x004A:
             case 0x004B:
                 return self::PROFILE_FAN_RPM;
+            case 0x0063:
+                return self::PROFILE_FILTER_DAYS;
+            case 0x0065:
+            case 0x0080:
+            case 0x0087:
+            case 0x00A0:
+            case 0x00A2:
+            case 0x012A:
+                return self::PROFILE_EXECUTE;
+            case 0x0066:
+                return self::PROFILE_DELAY_MINUTES;
+            case 0x0072:
+                return self::PROFILE_WEEKLY_SCHEDULE_MODE;
             case 0x0083:
                 return self::PROFILE_ALARM_WARNING;
             case 0x0088:
                 return self::PROFILE_FILTER_REPLACEMENT;
+            case 0x0094:
+                return self::PROFILE_WIFI_MODE;
+            case 0x0099:
+                return self::PROFILE_WIFI_ENCRYPTION;
+            case 0x009A:
+                return self::PROFILE_WIFI_CHANNEL;
+            case 0x009B:
+                return self::PROFILE_WIFI_DHCP;
+            case 0x00B7:
+                return self::PROFILE_VENTILATOR_MODE;
+            case 0x00B8:
+                return self::PROFILE_PERCENT_5_100;
             case 0x00B9:
                 return self::PROFILE_UNIT_TYPE;
+            case 0x0304:
+            case 0x0305:
+                return self::PROFILE_THRESHOLD_STATUS;
         }
 
         return '';
