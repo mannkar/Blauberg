@@ -62,7 +62,6 @@ class VentoExpert extends IPSModuleStrict
         $this->RegisterAttributeString('LastTxTime', '0');
 
         $this->RegisterTimer('PollTimer', 0, 'BVE_Poll($_IPS["TARGET"]);');
-        $this->RegisterTimer('ParentRecheckTimer', 0, 'BVE_RecheckParent($_IPS["TARGET"]);');
     }
 
     public function ApplyChanges(): void
@@ -81,28 +80,26 @@ class VentoExpert extends IPSModuleStrict
 
         if (!$this->IsParentReady()) {
             $this->SetStatus(self::STATUS_PARENT_INACTIVE);
-            $this->SetTimerInterval('ParentRecheckTimer', 1500);
+            $this->RegisterOnceTimer('ParentRecheckOnce', 'BVE_RecheckParent($_IPS["TARGET"]);');
             return;
         }
 
-        $this->SetTimerInterval('ParentRecheckTimer', 0);
         $this->SetStatus(102);
     }
 
     public function RecheckParent(): void
     {
         if (!$this->ValidateConfiguration()) {
-            $this->SetTimerInterval('ParentRecheckTimer', 0);
             return;
         }
 
         if ($this->IsParentReady()) {
             $this->SetStatus(102);
-            $this->SetTimerInterval('ParentRecheckTimer', 0);
             return;
         }
 
         $this->SetStatus(self::STATUS_PARENT_INACTIVE);
+        $this->RegisterOnceTimer('ParentRecheckOnce', 'BVE_RecheckParent($_IPS["TARGET"]);');
     }
 
     public function GetCompatibleParents(): string
@@ -1183,45 +1180,72 @@ class VentoExpert extends IPSModuleStrict
     private function BuildPollParameterRows(): array
     {
         $rows = $this->GetPollRows();
-        if ($rows === []) {
-            $rows = [
-                ['enabled' => true, 'address' => '0x0001'],
-                ['enabled' => true, 'address' => '0x0002'],
-                ['enabled' => true, 'address' => '0x0006'],
-                ['enabled' => true, 'address' => '0x0007'],
-                ['enabled' => true, 'address' => '0x0025'],
-                ['enabled' => true, 'address' => '0x004A'],
-                ['enabled' => true, 'address' => '0x004B'],
-                ['enabled' => true, 'address' => '0x0083'],
-                ['enabled' => true, 'address' => '0x0088'],
-                ['enabled' => true, 'address' => '0x00B9']
+        $defaultEnabled = [
+            0x0001,
+            0x0002,
+            0x0006,
+            0x0007,
+            0x0025,
+            0x004A,
+            0x004B,
+            0x0083,
+            0x0088,
+            0x00B9
+        ];
+
+        $configured = [];
+        $unknownRows = [];
+        foreach ($rows as $row) {
+            $addressText = isset($row['address']) ? (string) $row['address'] : '';
+            try {
+                $address = $this->ParseAddress($addressText);
+                $configured[$address] = array_key_exists('enabled', $row) ? (bool) $row['enabled'] : true;
+            } catch (Throwable $e) {
+                $unknownRows[] = [
+                    'enabled' => array_key_exists('enabled', $row) ? (bool) $row['enabled'] : false,
+                    'address' => $addressText,
+                    'name' => 'Invalid address',
+                    'access' => '',
+                    'type' => ''
+                ];
+            }
+        }
+
+        $definitions = $this->GetParameterDefinitions();
+        ksort($definitions);
+        $values = [];
+        foreach ($definitions as $address => $definition) {
+            if (array_key_exists($address, $configured)) {
+                $enabled = $configured[$address];
+            } elseif ($rows === []) {
+                $enabled = in_array($address, $defaultEnabled, true);
+            } else {
+                $enabled = false;
+            }
+            $values[] = [
+                'enabled' => $enabled,
+                'address' => sprintf('0x%04X', $address),
+                'name' => $definition['name'] ?? sprintf('Parameter 0x%04X', $address),
+                'access' => $definition['access'] ?? '',
+                'type' => $definition['type'] ?? 'uint'
             ];
         }
 
-        $values = [];
-        foreach ($rows as $row) {
-            $addressText = isset($row['address']) ? (string) $row['address'] : '';
-            $name = '';
-            $access = '';
-            $type = '';
-            try {
-                $address = $this->ParseAddress($addressText);
-                $definition = $this->GetParameterDefinition($address);
-                $name = $definition['name'] ?? sprintf('Parameter 0x%04X', $address);
-                $access = $definition['access'] ?? '';
-                $type = $definition['type'] ?? 'uint';
-                $addressText = sprintf('0x%04X', $address);
-            } catch (Throwable $e) {
-                $name = 'Invalid address';
+        foreach ($configured as $address => $enabled) {
+            if (isset($definitions[$address])) {
+                continue;
             }
-
             $values[] = [
-                'enabled' => array_key_exists('enabled', $row) ? (bool) $row['enabled'] : true,
-                'address' => $addressText,
-                'name' => $name,
-                'access' => $access,
-                'type' => $type
+                'enabled' => $enabled,
+                'address' => sprintf('0x%04X', $address),
+                'name' => sprintf('Manual parameter 0x%04X', $address),
+                'access' => '',
+                'type' => 'auto'
             ];
+        }
+
+        foreach ($unknownRows as $unknownRow) {
+            $values[] = $unknownRow;
         }
 
         return $values;
