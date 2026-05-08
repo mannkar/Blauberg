@@ -5,8 +5,10 @@ declare(strict_types=1);
 class VentoExpert extends IPSModuleStrict
 {
     private const GUID_UDP_SOCKET = '{82347F20-F541-41E1-AC5B-A636FD3AE2D8}';
-    private const DATA_ID_UDP_TX = '{C8792760-65CF-4C53-B5C7-A30FCC84FEFE}';
-    private const DATA_ID_UDP_RX = '{7A1272A4-CBDB-46EF-BFC6-DCF4A53D2FC7}';
+    private const DATA_ID_SOCKET_TX = '{C8792760-65CF-4C53-B5C7-A30FCC84FEFE}';
+    private const DATA_ID_SOCKET_RX = '{7A1272A4-CBDB-46EF-BFC6-DCF4A53D2FC7}';
+    private const DATA_ID_UDP_TX = '{8E4D9B23-E0F2-1E05-41D8-C21EA53B8706}';
+    private const DATA_ID_UDP_RX = '{9082C662-7864-D5CA-863F-53999200D897}';
 
     private const STATUS_HOST_MISSING = 201;
     private const STATUS_PORT_INVALID = 202;
@@ -60,6 +62,7 @@ class VentoExpert extends IPSModuleStrict
         $this->RegisterAttributeString('LastTxTime', '0');
 
         $this->RegisterTimer('PollTimer', 0, 'BVE_Poll($_IPS["TARGET"]);');
+        $this->RegisterTimer('ParentRecheckTimer', 0, 'BVE_RecheckParent($_IPS["TARGET"]);');
     }
 
     public function ApplyChanges(): void
@@ -76,12 +79,30 @@ class VentoExpert extends IPSModuleStrict
         $pollInterval = max(0, $this->ReadPropertyInteger('PollInterval'));
         $this->SetTimerInterval('PollTimer', $pollInterval > 0 ? $pollInterval * 1000 : 0);
 
-        if (!$this->HasActiveParent()) {
+        if (!$this->IsParentReady()) {
             $this->SetStatus(self::STATUS_PARENT_INACTIVE);
+            $this->SetTimerInterval('ParentRecheckTimer', 1500);
             return;
         }
 
+        $this->SetTimerInterval('ParentRecheckTimer', 0);
         $this->SetStatus(102);
+    }
+
+    public function RecheckParent(): void
+    {
+        if (!$this->ValidateConfiguration()) {
+            $this->SetTimerInterval('ParentRecheckTimer', 0);
+            return;
+        }
+
+        if ($this->IsParentReady()) {
+            $this->SetStatus(102);
+            $this->SetTimerInterval('ParentRecheckTimer', 0);
+            return;
+        }
+
+        $this->SetStatus(self::STATUS_PARENT_INACTIVE);
     }
 
     public function GetCompatibleParents(): string
@@ -122,6 +143,9 @@ class VentoExpert extends IPSModuleStrict
 
         $this->SetFormFieldRecursive($form, 'PollParameters', 'values', $this->BuildPollParameterRows());
         $this->SetFormFieldRecursive($form, 'ParameterBrowser', 'values', $this->BuildParameterBrowserRows());
+        if ($this->IsConfiguredDefaultDeviceId()) {
+            $this->SetFormFieldRecursive($form, 'ReadAddress', 'value', '0x007C');
+        }
 
         return json_encode($form);
     }
@@ -135,12 +159,12 @@ class VentoExpert extends IPSModuleStrict
         }
 
         $dataId = isset($data['DataID']) ? (string) $data['DataID'] : '';
-        if ($dataId === self::DATA_ID_UDP_RX && isset($data['Type']) && (int) $data['Type'] !== 0) {
+        if (($dataId === self::DATA_ID_SOCKET_RX || $dataId === self::DATA_ID_UDP_RX) && isset($data['Type']) && (int) $data['Type'] !== 0) {
             $this->DebugLog(self::DEBUG_VERBOSE, 'RX Event', $this->JsonEncode($data));
             return '';
         }
 
-        $packet = utf8_decode((string) $data['Buffer']);
+        $packet = $this->DecodeIncomingBuffer((string) $data['Buffer']);
         $source = [
             'dataID' => $dataId,
             'clientIP' => isset($data['ClientIP']) ? (string) $data['ClientIP'] : '',
@@ -152,6 +176,9 @@ class VentoExpert extends IPSModuleStrict
             $parsed['source'] = $source;
             $this->AddDebugFrame('RX', $packet, $parsed, 'received');
             $this->LogParsedPacket('RX', $parsed);
+            if ($this->GetStatus() === self::STATUS_PARENT_INACTIVE) {
+                $this->SetStatus(102);
+            }
 
             if (!$parsed['checksumOK']) {
                 $this->TraceUnexpected('RX', 'Checksum mismatch', $parsed);
@@ -206,8 +233,17 @@ class VentoExpert extends IPSModuleStrict
                 case 'ReadParameterForm':
                     $address = $this->ParseAddress($value);
                     $result = $this->ReadParameter($address);
-                    $this->UpdateFormField('ParameterBrowser', 'values', $this->BuildParameterBrowserRows());
+                    $this->UpdateFormField('ParameterBrowser', 'values', $this->JsonEncode($this->BuildParameterBrowserRows()));
                     $this->EchoMessage(sprintf('0x%04X = %s', $address, $this->ValueToDebugString($result)));
+                    break;
+
+                case 'DiscoverDeviceID':
+                    $info = $this->DiscoverAndApplyDeviceId();
+                    $this->EchoMessage(sprintf(
+                        'Discovered DeviceID "%s" (UnitType: %s). DeviceID was applied and instance was reloaded.',
+                        $info['deviceId'],
+                        $this->ValueToDebugString($info['unitType'])
+                    ));
                     break;
 
                 case 'WriteParameterForm':
@@ -215,7 +251,7 @@ class VentoExpert extends IPSModuleStrict
                     $address = $this->ParseAddress($payload['address'] ?? '');
                     $requireResponse = array_key_exists('requireResponse', $payload) ? (bool) $payload['requireResponse'] : true;
                     $result = $this->WriteParameter($address, $payload['value'] ?? '', $requireResponse);
-                    $this->UpdateFormField('ParameterBrowser', 'values', $this->BuildParameterBrowserRows());
+                    $this->UpdateFormField('ParameterBrowser', 'values', $this->JsonEncode($this->BuildParameterBrowserRows()));
                     $this->EchoMessage($requireResponse ? sprintf('0x%04X = %s', $address, $this->ValueToDebugString($result)) : sprintf('0x%04X written without response.', $address));
                     break;
 
@@ -239,7 +275,7 @@ class VentoExpert extends IPSModuleStrict
 
                 case 'PollNow':
                     $this->Poll();
-                    $this->UpdateFormField('ParameterBrowser', 'values', $this->BuildParameterBrowserRows());
+                    $this->UpdateFormField('ParameterBrowser', 'values', $this->JsonEncode($this->BuildParameterBrowserRows()));
                     $this->EchoMessage('Polling completed.');
                     break;
 
@@ -345,7 +381,7 @@ class VentoExpert extends IPSModuleStrict
                 'passwordLength' => strlen($this->ReadPropertyString('Password')),
                 'timeoutMs' => $this->ReadPropertyInteger('Timeout'),
                 'retries' => $this->ReadPropertyInteger('Retries'),
-                'parentActive' => $this->HasActiveParent()
+                'parentActive' => $this->IsParentReady()
             ],
             'packetBuilder' => [],
             'onlineRead' => null
@@ -360,7 +396,7 @@ class VentoExpert extends IPSModuleStrict
             'checksumOK' => $parsed['checksumOK']
         ];
 
-        if ($this->ValidateConfiguration() && $this->HasActiveParent()) {
+        if ($this->ValidateConfiguration() && $this->IsParentReady()) {
             try {
                 $report['onlineRead'] = $this->ReadParametersBatch([0x0001, 0x0002]);
             } catch (Throwable $e) {
@@ -406,7 +442,7 @@ class VentoExpert extends IPSModuleStrict
                 'rateLimitMs' => $this->ReadPropertyInteger('RateLimit'),
                 'pollIntervalSeconds' => $this->ReadPropertyInteger('PollInterval'),
                 'debugLevel' => $this->ReadPropertyInteger('DebugLevel'),
-                'parentActive' => $this->HasActiveParent()
+                'parentActive' => $this->IsParentReady()
             ],
             'lastError' => $this->ReadAttributeString('LastError'),
             'cache' => is_array($cache) ? $cache : [],
@@ -441,6 +477,7 @@ class VentoExpert extends IPSModuleStrict
         $retries = max(0, $this->ReadPropertyInteger('Retries'));
         $timeout = max(100, $this->ReadPropertyInteger('Timeout'));
         $lastError = '';
+        $lastKnownRxError = $this->ReadAttributeString('LastError');
 
         for ($attempt = 1; $attempt <= $retries + 1; $attempt++) {
             $this->WriteAttributeString('LastResponse', '');
@@ -460,6 +497,11 @@ class VentoExpert extends IPSModuleStrict
 
             $lastError = sprintf('Timeout after %d ms on attempt %d.', $timeout, $attempt);
             $this->DebugLog(self::DEBUG_WARNING, 'Timeout', $lastError);
+        }
+
+        $hint = $this->BuildTimeoutHint($func, $dataBytes, $lastKnownRxError);
+        if ($hint !== '') {
+            $lastError .= ' ' . $hint;
         }
 
         $this->WriteAttributeString('LastError', $lastError);
@@ -482,22 +524,59 @@ class VentoExpert extends IPSModuleStrict
         $this->AddDebugFrame('TX', $packet, $parsed, 'attempt ' . $attempt);
         $this->LogParsedPacket('TX', is_array($parsed) ? $parsed : []);
 
-        $payload = [
-            'DataID' => self::DATA_ID_UDP_TX,
-            'Type' => 0,
-            'Buffer' => utf8_encode($packet),
-            'ClientIP' => $this->GetEffectiveHost(),
-            'ClientPort' => $this->GetEffectivePort()
-        ];
-
-        $encoded = json_encode($payload);
-        if (!is_string($encoded)) {
-            throw new RuntimeException('Unable to encode UDP payload.');
+        $parentId = $this->GetParentInstanceId();
+        if ($parentId <= 0) {
+            throw new RuntimeException('UDP socket parent is not connected.');
         }
 
-        $response = $this->SendDataToParent($encoded);
-        if ($response !== '') {
-            $this->DebugLog(self::DEBUG_TRACE, 'ParentResponse', $response);
+        $host = $this->GetEffectiveHost();
+        $port = $this->GetEffectivePort();
+        $sent = false;
+
+        if (function_exists('USCK_SendPacket')) {
+            $this->DebugLog(self::DEBUG_VERBOSE, 'TX Route', sprintf('USCK_SendPacket parent=%d host=%s port=%d', $parentId, $host, $port));
+            $sent = @USCK_SendPacket($parentId, $packet, $host, $port);
+            if (!$sent) {
+                $this->DebugLog(self::DEBUG_WARNING, 'TX Route', 'USCK_SendPacket returned false, trying dataflow fallback.');
+            }
+        }
+
+        if (!$sent) {
+            $payloadUdp = [
+                'DataID' => self::DATA_ID_UDP_TX,
+                'Buffer' => utf8_encode($packet),
+                'ClientIP' => $host,
+                'ClientPort' => $port,
+                'Broadcast' => $this->ReadPropertyBoolean('EnableBroadcast')
+            ];
+            $encodedUdp = json_encode($payloadUdp);
+            if (is_string($encodedUdp)) {
+                $responseUdp = $this->SendDataToParent($encodedUdp);
+                $this->DebugLog(self::DEBUG_TRACE, 'TX Route', 'Fallback via Extended(UDP) dataflow.');
+                if ($responseUdp !== '') {
+                    $this->DebugLog(self::DEBUG_TRACE, 'ParentResponse UDP', $responseUdp);
+                }
+                $sent = true;
+            }
+        }
+
+        if (!$sent) {
+            $payloadSocket = [
+                'DataID' => self::DATA_ID_SOCKET_TX,
+                'Type' => 0,
+                'Buffer' => utf8_encode($packet),
+                'ClientIP' => $host,
+                'ClientPort' => $port
+            ];
+            $encodedSocket = json_encode($payloadSocket);
+            if (!is_string($encodedSocket)) {
+                throw new RuntimeException('Unable to encode UDP payload for fallback transport.');
+            }
+            $responseSocket = $this->SendDataToParent($encodedSocket);
+            $this->DebugLog(self::DEBUG_TRACE, 'TX Route', 'Fallback via Extended(Socket) dataflow.');
+            if ($responseSocket !== '') {
+                $this->DebugLog(self::DEBUG_TRACE, 'ParentResponse Socket', $responseSocket);
+            }
         }
 
         $this->WriteAttributeString('LastTxTime', (string) microtime(true));
@@ -533,6 +612,170 @@ class VentoExpert extends IPSModuleStrict
     {
         $instance = IPS_GetInstance($this->InstanceID);
         return isset($instance['ConnectionID']) ? (int) $instance['ConnectionID'] : 0;
+    }
+
+    private function IsParentReady(): bool
+    {
+        $parentId = $this->GetParentInstanceId();
+        if ($parentId <= 0) {
+            return false;
+        }
+
+        $parent = @IPS_GetInstance($parentId);
+        if (!is_array($parent)) {
+            return false;
+        }
+
+        $status = isset($parent['InstanceStatus']) ? (int) $parent['InstanceStatus'] : 0;
+        if ($status === 102 || $status === 106) {
+            return true;
+        }
+
+        $open = @IPS_GetProperty($parentId, 'Open');
+        if (is_bool($open)) {
+            return $open;
+        }
+        if (is_int($open)) {
+            return $open > 0;
+        }
+        if (is_string($open)) {
+            $normalized = strtolower(trim($open));
+            if ($normalized === '1' || $normalized === 'true' || $normalized === 'on' || $normalized === 'yes') {
+                return true;
+            }
+            if ($normalized === '0' || $normalized === 'false' || $normalized === 'off' || $normalized === 'no') {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private function BuildTimeoutHint(int $func, array $dataBytes, string $lastKnownRxError): string
+    {
+        $hints = [];
+
+        if ($func === self::FUNC_READ && $this->IsConfiguredDefaultDeviceId() && !$this->IsDiscoveryReadData($dataBytes)) {
+            $hints[] = 'Hint: DeviceID is DEFAULT_DEVICEID. With router/network mode the unit usually answers only 0x007C and 0x00B9. Use "Discover DeviceID (0x007C/0x00B9)" and apply the discovered 16-character DeviceID.';
+        }
+
+        if ($this->ReadPropertyString('Password') === '1111') {
+            $hints[] = 'Hint: Password is still 1111. If changed in app, set the new password here.';
+        }
+
+        $currentRxError = $this->ReadAttributeString('LastError');
+        if ($currentRxError !== '' && $currentRxError !== $lastKnownRxError && stripos($currentRxError, 'Timeout after') === false) {
+            $hints[] = 'Last RX issue: ' . $currentRxError;
+        }
+
+        return implode(' ', $hints);
+    }
+
+    private function IsConfiguredDefaultDeviceId(): bool
+    {
+        return trim($this->ReadPropertyString('DeviceID')) === 'DEFAULT_DEVICEID';
+    }
+
+    private function IsDiscoveryReadData(array $dataBytes): bool
+    {
+        $addresses = $this->ExtractAddressesFromReadData($dataBytes);
+        if ($addresses === []) {
+            return false;
+        }
+
+        foreach ($addresses as $address) {
+            if ($address !== 0x007C && $address !== 0x00B9) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function ExtractAddressesFromReadData(array $dataBytes): array
+    {
+        $addresses = [];
+        $page = 0x00;
+
+        $count = count($dataBytes);
+        $i = 0;
+        while ($i < $count) {
+            $b = (int) $dataBytes[$i];
+            if ($b === self::CMD_PAGE) {
+                if (!isset($dataBytes[$i + 1])) {
+                    break;
+                }
+                $page = (int) $dataBytes[$i + 1];
+                $i += 2;
+                continue;
+            }
+
+            if ($b >= self::CMD_FUNC) {
+                $i++;
+                continue;
+            }
+
+            $addresses[] = (($page & 0xFF) << 8) | ($b & 0xFF);
+            $i++;
+        }
+
+        return $addresses;
+    }
+
+    private function DiscoverAndApplyDeviceId(): array
+    {
+        $data = $this->BuildReadData([0x007C, 0x00B9]);
+        $response = $this->Transact(self::FUNC_READ, $data, true);
+        $details = isset($response['parameters']) && is_array($response['parameters'])
+            ? $response['parameters']
+            : $this->ParseDataBlock($response['dataBytes'] ?? []);
+
+        if (!isset($details[0x007C]) || !is_array($details[0x007C])) {
+            throw new RuntimeException('Discovery response did not contain parameter 0x007C.');
+        }
+
+        $entryId = $details[0x007C];
+        $rawValue = $entryId['value'] ?? null;
+        $rawHex = isset($entryId['raw']) ? (string) $entryId['raw'] : '';
+        $deviceId = $this->NormalizeDiscoveredDeviceId($rawValue, $rawHex);
+        if (strlen($deviceId) !== 16) {
+            throw new RuntimeException('Discovered DeviceID does not contain exactly 16 characters.');
+        }
+
+        IPS_SetProperty($this->InstanceID, 'DeviceID', $deviceId);
+        IPS_ApplyChanges($this->InstanceID);
+
+        $unitType = null;
+        if (isset($details[0x00B9]) && is_array($details[0x00B9])) {
+            $unitType = $details[0x00B9]['value'] ?? null;
+        }
+
+        $this->DebugLog(self::DEBUG_INFO, 'Discovery', 'Applied discovered DeviceID: ' . $deviceId);
+
+        return [
+            'deviceId' => $deviceId,
+            'unitType' => $unitType
+        ];
+    }
+
+    private function NormalizeDiscoveredDeviceId(mixed $value, string $rawHex): string
+    {
+        if (is_string($value)) {
+            $text = trim($value, " \t\r\n\0");
+            if (strlen($text) === 16) {
+                return $text;
+            }
+        }
+
+        $bytes = $this->HexToBytes($rawHex);
+        if (count($bytes) === 16) {
+            $text = trim($this->BytesToAscii($bytes), " \t\r\n\0");
+            if (strlen($text) === 16) {
+                return $text;
+            }
+        }
+
+        throw new RuntimeException('Unable to normalize discovered DeviceID from 0x007C.');
     }
 
     private function WaitForResponse(float $started, int $timeoutMs): ?array
@@ -1462,6 +1705,28 @@ class VentoExpert extends IPSModuleStrict
 
         $bytes = unpack('C*', $data);
         return is_array($bytes) ? array_values($bytes) : [];
+    }
+
+    private function DecodeIncomingBuffer(string $buffer): string
+    {
+        // Standard Symcon socket flow: binary payload is transported as UTF-8 string.
+        $packet = utf8_decode($buffer);
+        $candidate = preg_replace('/\s+/', '', trim($packet));
+        if (!is_string($candidate) || $candidate === '') {
+            return $packet;
+        }
+
+        // Some environments echo packets as ASCII hex (e.g. "FDFD0210...").
+        // Auto-convert this format back to binary before parsing.
+        if ((strlen($candidate) % 2) === 0 && strlen($candidate) >= 4 && preg_match('/^[0-9A-Fa-f]+$/', $candidate) === 1) {
+            $bytes = $this->HexToBytes($candidate);
+            if (count($bytes) >= 2 && $bytes[0] === 0xFD && $bytes[1] === 0xFD) {
+                $this->DebugLog(self::DEBUG_VERBOSE, 'RX Decode', 'Detected ASCII-hex packet, converting to binary.');
+                return $this->StringFromBytes($bytes);
+            }
+        }
+
+        return $packet;
     }
 
     private function StringFromBytes(array $bytes): string

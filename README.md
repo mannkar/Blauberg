@@ -19,7 +19,7 @@ IP-Symcon Modul fuer die lokale LAN-Integration von Blauberg VENTO Expert W V.2/
 
 ## Voraussetzungen
 
-- IP-Symcon ab Version 8.1
+- IP-Symcon ab Version 9.0
 - Blauberg VENTO Expert W V.2/V.3 im gleichen LAN oder per Broadcast erreichbar
 - Device ID vom Geraeteaufkleber oder `DEFAULT_DEVICEID` fuer Suche/Default-Betrieb
 - Geraetepasswort, Standard: `1111`
@@ -27,8 +27,8 @@ IP-Symcon Modul fuer die lokale LAN-Integration von Blauberg VENTO Expert W V.2/
 ## Einrichtung
 
 1. Instanz `Vento Expert` anlegen.
-2. `IP/Host` auf die IP des Master-Geraets setzen, Port bei `4000` belassen.
-3. `DeviceID` auf die 16-stellige Geraete-ID setzen. Alternativ `DEFAULT_DEVICEID` nutzen, wenn das Geraet direkt oder fuer Suchparameter angesprochen wird.
+2. Als Parent den `UDP Socket` zuweisen und dort Host/Port setzen (Port `4000`).
+3. Bei `DeviceID = DEFAULT_DEVICEID` zuerst `Discover DeviceID (0x007C/0x00B9)` ausfuehren. Die gefundene 16-stellige DeviceID wird automatisch uebernommen.
 4. Passwort setzen.
 5. `SelfTest` ausfuehren.
 6. Mit `Read Parameter` zum Beispiel `0x0001` oder `0x0002` lesen.

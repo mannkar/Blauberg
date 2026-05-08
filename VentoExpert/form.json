@@ -168,6 +168,11 @@
                     "onClick": "IPS_RequestAction($id, 'SelfTest', '');"
                 },
                 {
+                    "type": "Button",
+                    "caption": "Discover DeviceID (0x007C/0x00B9)",
+                    "onClick": "IPS_RequestAction($id, 'DiscoverDeviceID', '');"
+                },
+                {
                     "type": "ValidationTextBox",
                     "name": "ReadAddress",
                     "caption": "Read address",
